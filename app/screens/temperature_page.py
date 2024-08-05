@@ -61,7 +61,7 @@ def box_component(color="red", value=0, label="Label"):
 def temperature_page():
 
     ip = get_local_ip()
-
+    
     # Exibindo o último horário de refresh da página
     st.write(f"Último refresh: {pd.Timestamp.now().strftime('%Y-%m-%d %H:%M:%S')}")
 

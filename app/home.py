@@ -19,8 +19,8 @@ st.set_page_config(
 # Cria navegação entre as páginas
 page = option_menu(
     None,
-    ["Página inicial", "Detecção de Curto", "Posição dos Pinos", "Teste de Temperatura"],
-    icons=["🏠", "slash-circle", "crosshair", "thermometer-half"],
+    ["Página inicial", "Teste de Temperatura"],
+    icons=["🏠", "thermometer-half"],
     default_index=0,
     orientation="horizontal",
     key="om_solar",
@@ -33,11 +33,11 @@ match page:
     case "Página inicial":
         home_page()
 
-    case "Detecção de Curto":
-        short_circuit_page()
+    # case "Detecção de Curto":
+    #     short_circuit_page()
 
-    case "Posição dos Pinos":
-        pin_page()
+    # case "Posição dos Pinos":
+    #     pin_page()
 
     case "Teste de Temperatura":
         temperature_page()
