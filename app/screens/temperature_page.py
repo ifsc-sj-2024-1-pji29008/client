@@ -1,3 +1,4 @@
+import requests
 import streamlit as st
 from flask import Flask
 from loguru import logger
@@ -6,6 +7,20 @@ import pandas as pd
 import plotly.express as px
 import numpy as np
 from datetime import datetime, timedelta
+import socket
+
+def get_local_ip():
+    try:
+        # Cria um socket para buscar o IP
+        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        sock.connect(('8.8.8.8', 80))  # Conecta a um endereço externo (neste caso, o Google DNS)
+        local_ip = sock.getsockname()[0]  # Obtém o IP de rede local
+        sock.close()
+        return local_ip
+    except Exception as e:
+        st.error(f"Erro ao obter o IP local: {e}")
+        return None
+
 
 def get_color(color):
     match color:
@@ -43,67 +58,32 @@ def box_component(color="red", value=0, label="Label"):
         unsafe_allow_html=True,
     )
 
-def generate_data():
-    timestamps = [datetime.now() - timedelta(minutes=1 * i) for i in range(30)]
-    sensors = ['Sensor 1', 'Sensor 2', 'Sensor 3']
-    data = {
-        'Timestamp': np.tile(timestamps, len(sensors)),
-        'Sensor': np.repeat(sensors, len(timestamps)),
-        'Temperatura': np.random.uniform(20, 30, len(timestamps) * len(sensors))
-    }
-    df = pd.DataFrame(data)
-    df = df.sort_values(by='Timestamp')
-    return df
-
 def temperature_page():
 
-    # Conectar ao banco de dados
-    conn = sqlite3.connect('test_jig_teste.db')
-    c = conn.cursor()
+    ip = get_local_ip()
 
-    # Loop que verifica se o valor "temperatura" na tabela "status_plano" é igual a "complete"
-    c.execute("""SELECT * FROM status_plano WHERE plano = 'temperatura';""")
-    data = c.fetchall()
+    # Exibindo o último horário de refresh da página
+    st.write(f"Último refresh: {pd.Timestamp.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
-
-    # Transformando data em um dataframe
-    data = pd.DataFrame(data, columns=['id', 'plano', 'status'])
-
-    if data['status'].values[0] != 'complete':
-        st.write("O teste de temperatura ainda não foi concluído.")
+    # Exibindo o status do sistema
+    response = requests.get(f"http://{ip}:5000/api/planos")
+    if response.status_code == 200:
+        df = pd.DataFrame(response.json())
+    
+    # Obtendo o id do último plano com o nome "temperatura" e status "finalizado"
+    if not df.empty:
+        df = df[(df["nome"] == "temperatura") & (df["status"] == "finalizado")]
+        df = df.sort_values("id", ascending=False).head(1)
+    else:
         st.stop()
 
-    c.execute("""SELECT * FROM sensor;""")
-    data = c.fetchall()
+    # Obtendo o ID do último plano
+    plano_id = df["id"].values[0]
 
-    # Transformando data em um dataframe
-    data = pd.DataFrame(data, columns=['id', 'temperature', 'verdict', 'serialNumber'])
+    # Obtendo os resultados dos testes
+    response = requests.get(f"http://{ip}:5000/api/planos/{plano_id}")
+    if response.status_code == 200:
+        df = pd.DataFrame(response.json())
 
-    # Criando uma coluna com o ID do dispositivo
-    data['device'] = data['serialNumber'].str[:13]
-
-    # Obtendo a última leitura de temperatura de cada sensor
-    last_readings = data.groupby('device').last().reset_index()
-
-    # Criando uma coluna com o veredito do teste
-    st.subheader("Resultado dos testes de temperatura")
-    columns = st.columns(len(last_readings))
-
-    # Criando caixas verdes ou vermelhas com a função box_component
-    for idx, row in last_readings.iterrows():
-        with columns[idx]:
-            color = 'green' if row['verdict'] == 'pass' else 'red'
-            box_component(color, f"{row['temperature']}º", row['serialNumber'])
-
-    #TODO: adaptar para utilizar os dados reais quando os tivermos
-    df = generate_data()
-    fig = px.line(df, x='Timestamp', y='Temperatura', color='Sensor', title='Temperatura dos Sensores ao Longo do Tempo')
-    fig.update_layout(xaxis_title='Timestamp', yaxis_title='Temperatura (°C)')
-    st.plotly_chart(fig, use_container_width=True)
-
-    with st.expander("Visualizar histórico de sensores com falha de temperatura"):
-        st.dataframe(data[data['verdict'] == 'fail'])
-
-    # Crie um dataframe com as colunas Timestamp, Sensor e Temperatura.
-
-    conn.close()
+    st.dataframe(df)
+    st.write(response.json())

@@ -4,6 +4,7 @@ from streamlit_option_menu import option_menu
 from screens.short_circuit_page import short_circuit_page
 from screens.pin_page import pin_page
 from screens.temperature_page import temperature_page
+from screens.home_page import home_page
 
 # Configuração de metadados da página
 st.set_page_config(
@@ -30,8 +31,7 @@ page = option_menu(
 
 match page:
     case "Página inicial":
-        st.title("Página inicial")
-        st.write("Selecione uma das opções no menu acima para visualizar os resultados dos testes.")
+        home_page()
 
     case "Detecção de Curto":
         short_circuit_page()

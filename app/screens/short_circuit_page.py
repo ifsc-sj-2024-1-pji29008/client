@@ -5,21 +5,22 @@ import pandas as pd
 import numpy as np
 import datetime
 import random
+import socket
+
+def get_local_ip():
+    try:
+        # Cria um socket para buscar o IP
+        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        sock.connect(('8.8.8.8', 80))  # Conecta a um endereço externo (neste caso, o Google DNS)
+        local_ip = sock.getsockname()[0]  # Obtém o IP de rede local
+        sock.close()
+        return local_ip
+    except Exception as e:
+        st.error(f"Erro ao obter o IP local: {e}")
+        return None
 
 def short_circuit_page():
-    st.title("Detecção de Curto")
-    st.write("Aqui você pode visualizar os resultados da detecção de curto-circuito.")
-    
 
-    data = {
-        'timestamp': pd.date_range(start='2021-01-01', periods=100),
-        'value': np.random.rand(100)
-    }
+    ip = get_local_ip()
 
-    df = pd.DataFrame(data)
-
-    # Printando o dataframe com o tamanho da página inteira
-    with st.expander("Visualizar dados", expanded=True):
-        st.dataframe(df, use_container_width=True)
-
-    # Adicione o código para visualização dos resultados de detecção de curto-circuito aqui
+    # Obtendo os dados de planos
