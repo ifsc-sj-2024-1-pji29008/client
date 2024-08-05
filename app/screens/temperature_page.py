@@ -1,3 +1,4 @@
+import json
 import requests
 import streamlit as st
 from flask import Flask
@@ -8,6 +9,8 @@ import plotly.express as px
 import numpy as np
 from datetime import datetime, timedelta
 import socket
+from streamlit_autorefresh import st_autorefresh
+
 
 def get_local_ip():
     try:
@@ -60,8 +63,11 @@ def box_component(color="red", value=0, label="Label"):
 
 def temperature_page():
 
+    # Realizando um auto-refresh na página a cada 10 segundos
+    st_autorefresh(interval=10 * 1000)
+
     ip = get_local_ip()
-    
+
     # Exibindo o último horário de refresh da página
     st.write(f"Último refresh: {pd.Timestamp.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
@@ -69,21 +75,59 @@ def temperature_page():
     response = requests.get(f"http://{ip}:5000/api/planos")
     if response.status_code == 200:
         df = pd.DataFrame(response.json())
+
+    try:
+        df["timestamp"] = pd.to_datetime(df["timestamp"])
+    except:
+        pass
+
+    # Inserindo os dados de temperatura
+    if df.empty or (df["timestamp"].max() <= (datetime.now() - timedelta(seconds=10))):
+        response = requests.post(f"http://{ip}:5000/api/plano/temperatura")
+
+    response = requests.get(f"http://{ip}:5000/api/planos")
+    if response.status_code == 200:
+        df = pd.DataFrame(response.json())
     
-    # Obtendo o id do último plano com o nome "temperatura" e status "finalizado"
-    if not df.empty:
-        df = df[(df["nome"] == "temperatura") & (df["status"] == "finalizado")]
-        df = df.sort_values("id", ascending=False).head(1)
-    else:
-        st.stop()
+    # Obtendo o id do último plano com o nome "temperatura" e status "finalizado"r
+    df = df[(df["nome"] == "temperatura") & (df["status"] == "finalizado")]
+    df_history = df.copy()
+    df = df.sort_values("id", ascending=False).head(1)
 
     # Obtendo o ID do último plano
-    plano_id = df["id"].values[0]
+    try:
+        plano_id = df["id"].values[0]
+    except:
+        return
 
     # Obtendo os resultados dos testes
     response = requests.get(f"http://{ip}:5000/api/planos/{plano_id}")
     if response.status_code == 200:
+        last_result = pd.DataFrame(response.json())
+    
+    df_dados = pd.DataFrame(response.json()['dados'])
+    df_vereditos = pd.DataFrame(response.json()['vereditos'])
+
+    # Removendo a coluna timestamp que ficará duplicada ao juntar os dataframes
+    df_dados.drop(columns=['timestamp'], inplace=True)
+
+    # Juntando os 2 dataframes pelo index das colunas, mantendo a quantidade de linhas
+    last_result = pd.concat([df_dados, df_vereditos], axis=1)
+
+    last_result["timestamp"] = pd.to_datetime(last_result["timestamp"])
+
+    columns = st.columns(len(last_result))
+
+    # Criando caixas coloridas indicando o status de cada sensor
+    for idx, row in last_result.iterrows():
+        with columns[idx]:
+            color = 'green' if row['resultado'] == 'pass' else 'red'
+            box_component(color, f"{row['temperatura']}º", row['sensor'])
+
+    # Criando um gráfico com a evolução da temperatura
+
+    response = requests.get(f"http://{ip}:5000/api/planos/{plano_id}")
+    if response.status_code == 200:
         df = pd.DataFrame(response.json())
 
-    st.dataframe(df)
-    st.write(response.json())
+    df_history["timestamp"] = pd.to_datetime(df_history["timestamp"])
