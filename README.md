@@ -74,6 +74,8 @@ pip install -r requirements.txt
 
 ### Iniciar a aplicação
 
+**obs:** antes de iniciar o front-end certifique que o servidor flask está rodando, se já estiver, só executar o comando a seguir
+
 ```bash
 streamlit run app/home.py
 ```
