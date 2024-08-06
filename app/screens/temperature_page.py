@@ -68,9 +68,6 @@ def temperature_page():
 
     ip = get_local_ip()
 
-    # Exibindo o último horário de refresh da página
-    st.write(f"Último refresh: {pd.Timestamp.now().strftime('%Y-%m-%d %H:%M:%S')}")
-
     # Exibindo o status do sistema
     response = requests.get(f"http://{ip}:5000/api/planos")
     if response.status_code == 200:
@@ -91,8 +88,17 @@ def temperature_page():
     
     # Obtendo o id do último plano com o nome "temperatura" e status "finalizado"r
     df = df[(df["nome"] == "temperatura") & (df["status"] == "finalizado")]
-    df_history = df.copy()
     df = df.sort_values("id", ascending=False).head(1)
+
+    # Pegando o timestamp do último plano
+    try:
+        timestamp = df["timestamp"].values[0]
+        timestamp = pd.to_datetime(timestamp)
+    except:
+        st.stop()
+
+    # Exibindo o último horário de refresh da página
+    st.write(f"Último refresh: {timestamp.strftime('%Y-%m-%d %H:%M:%S')}")
 
     # Obtendo o ID do último plano
     try:
@@ -124,10 +130,28 @@ def temperature_page():
             color = 'green' if row['resultado'] == 'pass' else 'red'
             box_component(color, f"{row['temperatura']}º", row['sensor'])
 
-    # Criando um gráfico com a evolução da temperatura
+    # Criando uma lista com todos os sensores
+    sensors = last_result['sensor'].unique()
 
-    response = requests.get(f"http://{ip}:5000/api/planos/{plano_id}")
-    if response.status_code == 200:
-        df = pd.DataFrame(response.json())
-
-    df_history["timestamp"] = pd.to_datetime(df_history["timestamp"])
+    # Realizando uma busca na API para obter os dados de temperatura por sensor
+    fig = None
+    colors = px.colors.qualitative.Plotly
+    for i in range(len(sensors)):
+        response = requests.get(f"http://{ip}:5000/api/sensores/{sensors[i]}")
+        if response.status_code == 200:
+            df_dados = pd.DataFrame(response.json()['dados'])
+            df_vereditos = pd.DataFrame(response.json()['vereditos'])
+            df_dados.drop(columns=['timestamp'], inplace=True)
+            df_sensor = pd.concat([df_dados, df_vereditos], axis=1)
+            df_sensor["timestamp"] = pd.to_datetime(df_sensor["timestamp"])
+            df_sensor = df_sensor.sort_values("timestamp")
+            df_sensor = df_sensor[df_sensor["timestamp"] >= (datetime.now() - timedelta(minutes=5))]
+            if fig is None:
+                fig = px.line(df_sensor, x="timestamp", y="temperatura", title=f"Temperatura dos sensores", color_discrete_sequence=[colors[i]])
+            else:
+                trace = px.line(df_sensor, x="timestamp", y="temperatura", title=f"Temperatura dos sensores", color_discrete_sequence=[colors[i]]).data[0]
+                trace.hovertemplate = f"Sensor {sensors[i]}<br>" + trace.hovertemplate
+                fig.add_trace(trace)
+    
+    if fig is not None:
+        st.plotly_chart(fig)
