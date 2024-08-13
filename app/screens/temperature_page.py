@@ -61,12 +61,18 @@ def box_component(color="red", value=0, label="Label"):
         unsafe_allow_html=True,
     )
 
+def temperature_test():
+    pass
+
 def temperature_page():
 
     # Realizando um auto-refresh na página a cada 10 segundos
-    st_autorefresh(interval=10 * 1000)
+    st_autorefresh(interval=30 * 1000)
 
     ip = get_local_ip()
+
+    response = requests.get(f"http://{ip}:5000/api/status")
+    status = response.json()["status"]
 
     # Exibindo o status do sistema
     response = requests.get(f"http://{ip}:5000/api/planos")
@@ -79,7 +85,7 @@ def temperature_page():
         pass
 
     # Inserindo os dados de temperatura
-    if df.empty or (df["timestamp"].max() <= (datetime.now() - timedelta(seconds=10))):
+    if ((df.empty or (df["timestamp"].max() <= (datetime.now() - timedelta(seconds=30)))) and status == "livre"):
         response = requests.post(f"http://{ip}:5000/api/plano/temperatura")
 
     response = requests.get(f"http://{ip}:5000/api/planos")
