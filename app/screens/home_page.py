@@ -4,6 +4,7 @@ import socket
 import pandas as pd
 from streamlit_autorefresh import st_autorefresh
 
+
 def get_color(color):
     match color:
         case "blue":
@@ -40,11 +41,14 @@ def box_component(color="red", value=0, label="Label"):
         unsafe_allow_html=True,
     )
 
+
 def get_local_ip():
     try:
         # Cria um socket para buscar o IP
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        sock.connect(('8.8.8.8', 80))  # Conecta a um endereço externo (neste caso, o Google DNS)
+        sock.connect(
+            ("8.8.8.8", 80)
+        )  # Conecta a um endereço externo (neste caso, o Google DNS)
         local_ip = sock.getsockname()[0]  # Obtém o IP de rede local
         sock.close()
         return local_ip

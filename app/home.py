@@ -1,8 +1,5 @@
 import streamlit as st
 from streamlit_option_menu import option_menu
-
-from screens.short_circuit_page import short_circuit_page
-from screens.pin_page import pin_page
 from screens.temperature_page import temperature_page
 from screens.home_page import home_page
 
@@ -32,12 +29,5 @@ page = option_menu(
 match page:
     case "Página inicial":
         home_page()
-
-    # case "Detecção de Curto":
-    #     short_circuit_page()
-
-    # case "Posição dos Pinos":
-    #     pin_page()
-
     case "Teste de Temperatura":
         temperature_page()
