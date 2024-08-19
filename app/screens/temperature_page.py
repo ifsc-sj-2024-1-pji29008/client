@@ -61,9 +61,6 @@ def box_component(color="red", value=0, label="Label"):
         unsafe_allow_html=True,
     )
 
-def temperature_test():
-    pass
-
 def temperature_page():
 
     # Realizando um auto-refresh na página a cada 10 segundos
@@ -111,33 +108,34 @@ def temperature_page():
         plano_id = df["id"].values[0]
     except:
         return
-
+    
     # Obtendo os resultados dos testes
     response = requests.get(f"http://{ip}:5000/api/planos/{plano_id}")
-    if response.status_code == 200:
-        last_result = pd.DataFrame(response.json())
-    
-    df_dados = pd.DataFrame(response.json()['dados'])
+    if response.status_code != 200:
+        st.error("Erro ao obter os resultados dos testes")
+
     df_vereditos = pd.DataFrame(response.json()['vereditos'])
 
-    # Removendo a coluna timestamp que ficará duplicada ao juntar os dataframes
-    df_dados.drop(columns=['timestamp'], inplace=True)
+    # st.dataframe(last_result)
 
-    # Juntando os 2 dataframes pelo index das colunas, mantendo a quantidade de linhas
-    last_result = pd.concat([df_dados, df_vereditos], axis=1)
+    # # Removendo a coluna timestamp que ficará duplicada ao juntar os dataframes
+    # df_dados.drop(columns=['timestamp'], inplace=True)
 
-    last_result["timestamp"] = pd.to_datetime(last_result["timestamp"])
+    # # Juntando os 2 dataframes pelo index das colunas, mantendo a quantidade de linhas
+    # last_result = pd.concat([df_dados, df_vereditos], axis=1)
 
-    columns = st.columns(len(last_result))
+    # last_result["timestamp"] = pd.to_datetime(last_result["timestamp"])
+
+    columns = st.columns(len(df_vereditos))
 
     # Criando caixas coloridas indicando o status de cada sensor
-    for idx, row in last_result.iterrows():
+    for idx, row in df_vereditos.iterrows():
         with columns[idx]:
             color = 'green' if row['resultado'] == 'pass' else 'red'
-            box_component(color, f"{row['temperatura']}º", row['sensor'])
+            box_component(color, f"{row['posicao']}", row['sensor'])
 
     # Criando uma lista com todos os sensores
-    sensors = last_result['sensor'].unique()
+    sensors = df_vereditos['sensor'].unique()
 
     # Realizando uma busca na API para obter os dados de temperatura por sensor
     fig = None
@@ -146,18 +144,18 @@ def temperature_page():
         response = requests.get(f"http://{ip}:5000/api/sensores/{sensors[i]}")
         if response.status_code == 200:
             df_dados = pd.DataFrame(response.json()['dados'])
-            df_vereditos = pd.DataFrame(response.json()['vereditos'])
-            df_dados.drop(columns=['timestamp'], inplace=True)
-            df_sensor = pd.concat([df_dados, df_vereditos], axis=1)
-            df_sensor["timestamp"] = pd.to_datetime(df_sensor["timestamp"])
-            df_sensor = df_sensor.sort_values("timestamp")
-            df_sensor = df_sensor[df_sensor["timestamp"] >= (datetime.now() - timedelta(minutes=5))]
+            df_dados["timestamp"] = pd.to_datetime(df_dados["timestamp"])
+            df_dados = df_dados.sort_values("timestamp")
+            # df_dados = df_dados[df_dados["timestamp"] >= (datetime.now() - timedelta(minutes=5))]
             if fig is None:
-                fig = px.line(df_sensor, x="timestamp", y="temperatura", title=f"Temperatura dos sensores", color_discrete_sequence=[colors[i]])
+                fig = px.line(df_dados, x="timestamp", y="temperatura", title=f"Temperatura dos sensores", color_discrete_sequence=[colors[i]])
             else:
-                trace = px.line(df_sensor, x="timestamp", y="temperatura", title=f"Temperatura dos sensores", color_discrete_sequence=[colors[i]]).data[0]
+                trace = px.line(df_dados, x="timestamp", y="temperatura", title=f"Temperatura dos sensores", color_discrete_sequence=[colors[i]]).data[0]
                 trace.hovertemplate = f"Sensor {sensors[i]}<br>" + trace.hovertemplate
                 fig.add_trace(trace)
     
     if fig is not None:
+
+        # Desabilitando a interpolação para que os dados sejam exibidos de forma mais fiel
+        fig.update_traces(line_shape='linear')
         st.plotly_chart(fig)
