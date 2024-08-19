@@ -2,6 +2,10 @@ import streamlit as st
 from streamlit_option_menu import option_menu
 from screens.temperature_page import temperature_page
 from screens.home_page import home_page
+import os
+
+def get_api_address():
+   return f"http://{os.environ['API_ADDRESS']}:{os.environ['API_PORT']}"
 
 # Configuração de metadados da página
 st.set_page_config(
@@ -28,6 +32,6 @@ page = option_menu(
 
 match page:
     case "Página inicial":
-        home_page()
+        home_page(get_api_address())
     case "Teste de Temperatura":
-        temperature_page()
+        temperature_page(get_api_address())

@@ -1,29 +1,13 @@
-import json
 import time
 import requests
 import streamlit as st
-import sqlite3
 import pandas as pd
 import plotly.express as px
 from datetime import datetime, timedelta
 import socket
+import os
 
 # from streamlit_autorefresh import st_autorefresh
-
-
-def get_local_ip():
-    try:
-        # Cria um socket para buscar o IP
-        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        sock.connect(
-            ("8.8.8.8", 80)
-        )  # Conecta a um endereço externo (neste caso, o Google DNS)
-        local_ip = sock.getsockname()[0]  # Obtém o IP de rede local
-        sock.close()
-        return local_ip
-    except Exception as e:
-        st.error(f"Erro ao obter o IP local: {e}")
-        return None
 
 
 def get_color(color):
@@ -92,22 +76,19 @@ def temperature_test():
     pass
 
 
-def temperature_page():
+def temperature_page(api_address):
 
     # Definindo o número máximo de tentativas
-    MAX_RETRIES = 3
+    MAX_RETRIES = 300
     retry_count = 0
 
     # Realizando um auto-refresh na página a cada 10 segundos
     # st_autorefresh(interval=30 * 1000)
-
-    ip = get_local_ip()
-
-    response = requests.get(f"http://{ip}:5000/api/status")
+    response = requests.get(f"{api_address}/api/status")
     status = response.json()["status"]
 
     # Exibindo o status do sistema
-    response = requests.get(f"http://{ip}:5000/api/planos")
+    response = requests.get(f"{api_address}/api/planos")
     if response.status_code == 200:
         df = pd.DataFrame(response.json())
 
@@ -117,38 +98,36 @@ def temperature_page():
         pass
 
     # Inserindo os dados de temperatura
-    if (
-        df.empty or (df["timestamp"].max() <= (datetime.now() - timedelta(seconds=30)))
-    ) and status == "livre":
-        response = requests.post(f"http://{ip}:5000/api/plano/temperatura")
+    if status == "livre":
+        response = requests.post(f"{api_address}/api/plano/temperatura")
 
-    response = requests.get(f"http://{ip}:5000/api/planos")
-    if response.status_code == 200:
-        df = pd.DataFrame(response.json())
+        if response.status_code != 200:
+            st.error("Não foi possível iniciar o teste de temperatura.")
+            st.stop()
 
-    # Obtendo o id do último plano com o nome "temperatura" e status "finalizado"r
-    df = df[(df["nome"] == "temperatura") & (df["status"] == "finalizado")]
-    df = df.sort_values("id", ascending=False).head(1)
+    dados_do_plano = response.json()
 
-    # Pegando o timestamp do último plano
-    try:
-        timestamp = df["timestamp"].values[0]
-        timestamp = pd.to_datetime(timestamp)
-    except:
-        st.stop()
+    # response = requests.get(f"{api_address}/api/planos")
+    # if response.status_code == 200:
+    #     df = pd.DataFrame(response.json())
+
+    # # Obtendo o id do último plano com o nome "temperatura" e status "finalizado"r
+    # df = df[(df["nome"] == "temperatura") & (df["status"] == "finalizado")]
+    # df = df.sort_values("id", ascending=False).head(1)
+
+    # # Pegando o timestamp do último plano
+    # try:
+    #     timestamp = df["timestamp"].values[0]
+    timestamp = pd.to_datetime(dados_do_plano["timestamp"])
+    # except:
+    #     st.stop()
 
     # Exibindo o último horário de refresh da página
     st.write(f"Último refresh: {timestamp.strftime('%Y-%m-%d %H:%M:%S')}")
 
-    # Obtendo o ID do último plano
-    try:
-        plano_id = df["id"].values[0]
-    except:
-        return
-
     # Loop de requisição com tentativas
     while retry_count < MAX_RETRIES:
-        response = requests.get(f"http://{ip}:5000/api/planos/{plano_id}")
+        response = requests.get(f"{api_address}/api/planos/{dados_do_plano['id']}")
         if response.status_code == 200:
             break
         retry_count += 1
@@ -173,7 +152,7 @@ def temperature_page():
     colors = px.colors.qualitative.Plotly
 
     for i in range(len(sensors)):
-        response = requests.get(f"http://{ip}:5000/api/sensores/{sensors[i]}")
+        response = requests.get(f"{api_address}/api/sensores/{sensors[i]}")
         if response.status_code == 200:
             df_dados = pd.DataFrame(response.json()["dados"])
             df_vereditos = pd.DataFrame(response.json()["vereditos"])
