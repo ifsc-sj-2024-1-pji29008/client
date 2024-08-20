@@ -101,9 +101,9 @@ def temperature_page(api_address):
     if status == "livre":
         response = requests.post(f"{api_address}/api/plano/temperatura")
 
-        if response.status_code != 200:
-            st.error("Não foi possível iniciar o teste de temperatura.")
-            st.stop()
+    else:
+        st.error("Não foi possível iniciar o teste de temperatura.")
+        st.stop()
 
     dados_do_plano = response.json()
 
@@ -150,36 +150,21 @@ def temperature_page(api_address):
     # Realizando uma busca na API para obter os dados de temperatura por sensor
     fig = None
     colors = px.colors.qualitative.Plotly
-
     for i in range(len(sensors)):
         response = requests.get(f"{api_address}/api/sensores/{sensors[i]}")
         if response.status_code == 200:
-            df_dados = pd.DataFrame(response.json()["dados"])
-            df_vereditos = pd.DataFrame(response.json()["vereditos"])
-            df_dados.drop(columns=["timestamp"], inplace=True)
-            df_sensor = pd.concat([df_dados, df_vereditos], axis=1)
-            df_sensor["timestamp"] = pd.to_datetime(df_sensor["timestamp"])
-            df_sensor = df_sensor.sort_values("timestamp")
-            df_sensor = df_sensor[
-                df_sensor["timestamp"] >= (datetime.now() - timedelta(minutes=5))
-            ]
+            df_dados = pd.DataFrame(response.json()['dados'])
+            df_dados["timestamp"] = pd.to_datetime(df_dados["timestamp"])
+            df_dados = df_dados.sort_values("timestamp")
+            # df_dados = df_dados[df_dados["timestamp"] >= (datetime.now() - timedelta(minutes=5))]
             if fig is None:
-                fig = px.line(
-                    df_sensor,
-                    x="timestamp",
-                    y="temperatura",
-                    title=f"Temperatura dos sensores",
-                    color_discrete_sequence=[colors[i]],
-                )
-            trace = px.line(
-                df_sensor,
-                x="timestamp",
-                y="temperatura",
-                title=f"Temperatura dos sensores",
-                color_discrete_sequence=[colors[i]],
-            ).data[0]
-            trace.hovertemplate = f"Sensor {sensors[i]}<br>" + trace.hovertemplate
-            fig.add_trace(trace)
+                fig = px.line(df_dados, x="timestamp", y="temperatura", title=f"Temperatura dos sensores", color_discrete_sequence=[colors[i]])
+            else:
+                trace = px.line(df_dados, x="timestamp", y="temperatura", title=f"Temperatura dos sensores", color_discrete_sequence=[colors[i]]).data[0]
+                trace.hovertemplate = f"Sensor {sensors[i]}<br>" + trace.hovertemplate
+                fig.add_trace(trace)
 
     if fig is not None:
+        # Desabilitando a interpolação para que os dados sejam exibidos de forma mais fiel
+        fig.update_traces(line_shape='linear')
         st.plotly_chart(fig)
