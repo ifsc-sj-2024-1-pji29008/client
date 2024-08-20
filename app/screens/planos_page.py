@@ -1,3 +1,4 @@
+from email.policy import default
 import streamlit as st
 import plotly.express as px
 import pandas as pd
@@ -5,9 +6,19 @@ import requests
 import time
 
 
-def iniciar_plano(api_address, nome):
-    """Função para iniciar um novo plano com o nome fornecido"""
-    response = requests.post(f"{api_address}/api/plano/{nome}")
+def iniciar_plano(
+    api_address, nome, temperatura=None, margem_erro=None, numero_amostras=None
+):
+    """Função para iniciar um novo plano com o nome fornecido e parâmetros adicionais"""
+    payload = {
+        "temperatura": temperatura,
+        "margem_erro": margem_erro,
+        "numero_amostras": numero_amostras,
+    }
+    # Remover itens do payload que são None
+    payload = {k: v for k, v in payload.items() if v is not None}
+
+    response = requests.post(f"{api_address}/api/plano/{nome}", json=payload)
     if response.status_code == 200:
         return response.json()  # Assumindo que a resposta é um JSON
     else:
@@ -92,43 +103,61 @@ def planos_page(api_address):
 
     st.subheader("Iniciar um novo plano de testes")
 
-    col1, col2 = st.columns([2, 1])
+    nome_planos = ["temperatura"]
 
+    plano_nome = st.selectbox("Nome do Plano", options=nome_planos)
+
+    col1, col2, col3 = st.columns(3)
     with col1:
         # Input para o nome do novo plano
-        plano_nome = st.text_input("Plano")
+        temperatura = st.number_input(
+            "Temperatura", min_value=-100.0, max_value=100.0, step=0.5, value=25.0
+        )
 
     with col2:
-        # Botão para iniciar o plano selecionado
-        if st.button("Iniciar"):
-            if plano_nome:
-                st.info("Iniciando o plano...")
-                # Enviar o POST para iniciar o plano
-                plano_iniciado = iniciar_plano(api_address, plano_nome)
-                if plano_iniciado:
-                    plano_id = plano_iniciado.get("id")
-                    st.success(
-                        f"Plano iniciado com ID: {plano_id}. Verificando status..."
-                    )
+        margem_erro = st.number_input(
+            "Margem de Erro", min_value=0.0, max_value=100.0, step=0.5, value=1.0
+        )
 
-                    # Verificar o status do plano até ser finalizado
-                    while True:
-                        status = verificar_status_plano(api_address, plano_id)
-                        if status:
-                            st.success("Plano finalizado com sucesso!")
-                            break
-                        else:
-                            st.warning("Aguarde...")
-                        time.sleep(1)  # Esperar 5 segundos antes de verificar novamente
-            else:
-                st.error("Por favor, insira um nome para o plano.")
+    with col3:
+        numero_amostras = st.number_input(
+            "Número de Amostras", min_value=1, step=1, value=3
+        )
+
+    if st.button("Iniciar"):
+        if plano_nome:
+            st.info("Iniciando o plano...")
+            # Enviar o POST para iniciar o plano com os parâmetros adicionais
+            plano_iniciado = iniciar_plano(
+                api_address, plano_nome, temperatura, margem_erro, numero_amostras
+            )
+            if plano_iniciado:
+                plano_id = plano_iniciado.get("id")
+                st.success(f"Plano iniciado com ID: {plano_id}. Verificando status...")
+
+                # Verificar o status do plano até ser finalizado
+                while True:
+                    status = verificar_status_plano(api_address, plano_id)
+                    if status:
+                        st.success("Plano finalizado com sucesso!")
+                        break
+                    else:
+                        st.warning("Aguarde...")
+                    time.sleep(1)  # Esperar 1 segundo antes de verificar novamente
+        else:
+            st.error("Por favor, insira um nome para o plano.")
 
     st.subheader("Resultados do plano")
     # Carregar os planos existentes
     planos = requests.get(f"{api_address}/api/planos").json()
 
     # Criação do menu dropdown
-    plano_opcoes = {f"{plano['nome']}:{plano['id']}": plano["id"] for plano in planos}
+    plano_opcoes = {
+        f"id: {plano['id']}, nome: {plano['nome']}, temp: {plano["temperatura"]}, margem: {plano["margem_erro"]}, amostras: {plano["numero_amostras"]}": plano[
+            "id"
+        ]
+        for plano in reversed(planos)
+    }
     plano_selecionado = st.selectbox("Selecione um plano", options=plano_opcoes.keys())
 
     # Obter o ID do plano selecionado
