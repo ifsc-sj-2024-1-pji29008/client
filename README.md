@@ -60,3 +60,22 @@ project_root/
 ├── README.md            # Arquivo README com informações sobre o projeto
 |__ .gitignore           # Arquivo para ignorar arquivos e diretórios no controle de versão
 ```
+
+
+
+## Dashboard de Teste de Sensores
+
+### Página Inicial
+
+#### Status do sistema
+![Standby](/imagens/tela-inicial-livre.png)
+![Execução](/imagens/tela-inicial-executando.png)
+
+#### Lista de Sensores
+![Lista de Sensores](/imagens/sensores.png)
+
+### Planos
+![Planos](/imagens/tela-planos.png)
+![Resultados](/imagens/resultados.png)
+![Graficos](/imagens/planos-grafico.png)
+
