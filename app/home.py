@@ -1,7 +1,8 @@
-import streamlit as st
-from streamlit_option_menu import option_menu
-from screens.temperature_page import temperature_page
 from screens.home_page import home_page
+from screens.planos_page import planos_page
+
+from streamlit_option_menu import option_menu
+import streamlit as st
 import os
 
 def get_api_address():
@@ -20,7 +21,7 @@ st.set_page_config(
 # Cria navegação entre as páginas
 page = option_menu(
     None,
-    ["Página inicial", "Teste de Temperatura"],
+    ["Página inicial", "Planos"],
     icons=["🏠", "thermometer-half"],
     default_index=0,
     orientation="horizontal",
@@ -33,5 +34,5 @@ page = option_menu(
 match page:
     case "Página inicial":
         home_page(get_api_address())
-    case "Teste de Temperatura":
-        temperature_page(get_api_address())
+    case "Planos":
+        planos_page(get_api_address())
