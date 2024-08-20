@@ -22,7 +22,8 @@ def verificar_status_plano(api_address, plano_id):
         return response.json()  # Assumindo que a resposta é um JSON
     else:
         return None
-    
+
+
 def get_color(color):
     match color:
         case "blue":
@@ -59,7 +60,8 @@ def box_component(color="red", value="null", label="Label"):
         """,
         unsafe_allow_html=True,
     )
-    
+
+
 def create_boxes(df_vereditos):
     max_elements_per_row = 6  # Defina o número máximo de elementos por linha
     num_boxes = 24  # Número total de caixas
@@ -87,7 +89,7 @@ def create_boxes(df_vereditos):
 def planos_page(api_address):
 
     st.title("Gerenciamento de Planos")
-    
+
     st.subheader("Iniciar um novo plano de testes")
 
     col1, col2 = st.columns([2, 1])
@@ -116,24 +118,18 @@ def planos_page(api_address):
                             st.success("Plano finalizado com sucesso!")
                             break
                         else:
-                            st.warning(
-                                "Aguarde..."
-                            )
+                            st.warning("Aguarde...")
                         time.sleep(1)  # Esperar 5 segundos antes de verificar novamente
             else:
                 st.error("Por favor, insira um nome para o plano.")
-                
+
     st.subheader("Resultados do plano")
     # Carregar os planos existentes
     planos = requests.get(f"{api_address}/api/planos").json()
 
     # Criação do menu dropdown
-    plano_opcoes = {
-        f"{plano['nome']}:{plano['id']}": plano["id"] for plano in planos
-    }
-    plano_selecionado = st.selectbox(
-        "Selecione um plano", options=plano_opcoes.keys()
-    )
+    plano_opcoes = {f"{plano['nome']}:{plano['id']}": plano["id"] for plano in planos}
+    plano_selecionado = st.selectbox("Selecione um plano", options=plano_opcoes.keys())
 
     # Obter o ID do plano selecionado
     plano_id = plano_opcoes.get(plano_selecionado)
@@ -142,13 +138,13 @@ def planos_page(api_address):
         # Carregar e exibir os detalhes do plano selecionado
         plano_detalhes = requests.get(f"{api_address}/api/planos/{plano_id}").json()
         # st.json(plano_detalhes)  # Exibe os detalhes em formato JSON
-        
+
         df_vereditos = pd.DataFrame(plano_detalhes["vereditos"])
         df_vereditos["timestamp"] = pd.to_datetime(df_vereditos["timestamp"])
         create_boxes(df_vereditos)
-        
+
         # Criando uma lista com todos os sensores
-        df_dados = pd.DataFrame(plano_detalhes["dados"])        
+        df_dados = pd.DataFrame(plano_detalhes["dados"])
         sensors = df_dados["sensor"].unique()
 
         # Realizando uma busca na API para obter os dados de temperatura por sensor
@@ -157,18 +153,32 @@ def planos_page(api_address):
         for i in range(len(sensors)):
             response = requests.get(f"{api_address}/api/sensores/{sensors[i]}")
             if response.status_code == 200:
-                df_dados = pd.DataFrame(response.json()['dados'])
+                df_dados = pd.DataFrame(response.json()["dados"])
                 df_dados["timestamp"] = pd.to_datetime(df_dados["timestamp"])
                 df_dados = df_dados.sort_values("timestamp")
                 # df_dados = df_dados[df_dados["timestamp"] >= (datetime.now() - timedelta(minutes=5))]
                 if fig is None:
-                    fig = px.line(df_dados, x="timestamp", y="temperatura", title=f"Temperatura dos sensores", color_discrete_sequence=[colors[i]])
+                    fig = px.line(
+                        df_dados,
+                        x="timestamp",
+                        y="temperatura",
+                        title=f"Temperatura dos sensores",
+                        color_discrete_sequence=[colors[i]],
+                    )
                 else:
-                    trace = px.line(df_dados, x="timestamp", y="temperatura", title=f"Temperatura dos sensores", color_discrete_sequence=[colors[i]]).data[0]
-                    trace.hovertemplate = f"Sensor {sensors[i]}<br>" + trace.hovertemplate
+                    trace = px.line(
+                        df_dados,
+                        x="timestamp",
+                        y="temperatura",
+                        title=f"Temperatura dos sensores",
+                        color_discrete_sequence=[colors[i]],
+                    ).data[0]
+                    trace.hovertemplate = (
+                        f"Sensor {sensors[i]}<br>" + trace.hovertemplate
+                    )
                     fig.add_trace(trace)
 
         if fig is not None:
             # Desabilitando a interpolação para que os dados sejam exibidos de forma mais fiel
-            fig.update_traces(line_shape='linear')
+            fig.update_traces(line_shape="linear")
             st.plotly_chart(fig)

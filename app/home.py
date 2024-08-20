@@ -5,8 +5,10 @@ from streamlit_option_menu import option_menu
 import streamlit as st
 import os
 
+
 def get_api_address():
-   return f"http://{os.environ['API_ADDRESS']}:{os.environ['API_PORT']}"
+    return f"http://{os.environ['API_ADDRESS']}:{os.environ['API_PORT']}"
+
 
 # Configuração de metadados da página
 st.set_page_config(

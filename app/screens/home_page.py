@@ -41,6 +41,7 @@ def box_component(color="red", value=0, label="Label"):
         unsafe_allow_html=True,
     )
 
+
 def home_page(api_address):
     # Realizando um auto-refresh na página a cada 1 minuto
     st_autorefresh(interval=30 * 1000)
