@@ -1,14 +1,13 @@
 import json
+import time
 import requests
 import streamlit as st
-from flask import Flask
-from loguru import logger
 import sqlite3
 import pandas as pd
 import plotly.express as px
-import numpy as np
 from datetime import datetime, timedelta
 import socket
+
 from streamlit_autorefresh import st_autorefresh
 
 
@@ -16,7 +15,9 @@ def get_local_ip():
     try:
         # Cria um socket para buscar o IP
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        sock.connect(('8.8.8.8', 80))  # Conecta a um endereço externo (neste caso, o Google DNS)
+        sock.connect(
+            ("8.8.8.8", 80)
+        )  # Conecta a um endereço externo (neste caso, o Google DNS)
         local_ip = sock.getsockname()[0]  # Obtém o IP de rede local
         sock.close()
         return local_ip
@@ -38,7 +39,7 @@ def get_color(color):
     return color
 
 
-def box_component(color="red", value=0, label="Label"):
+def box_component(color="red", value="null", label="Label"):
     color = get_color(color)
 
     st.markdown(
@@ -53,6 +54,7 @@ def box_component(color="red", value=0, label="Label"):
                     display: flex;
                     flex-direction: column;
                     justify-content: center;
+                    min-width: 50px;
                     ">
             <p style="margin: auto;">{label}</p>
             <p style="margin: auto; font-weight: 600; font-size: 1.75em">{value}</p>
@@ -61,15 +63,45 @@ def box_component(color="red", value=0, label="Label"):
         unsafe_allow_html=True,
     )
 
+
+def create_boxes(df_vereditos):
+    max_elements_per_row = 6  # Defina o número máximo de elementos por linha
+    num_boxes = 24  # Número total de caixas
+
+    for i in range(0, num_boxes, max_elements_per_row):
+        cols = st.columns(max_elements_per_row)
+        for j in range(max_elements_per_row):
+            posicao = i + j + 1
+            if posicao > num_boxes:
+                break
+            with cols[j]:
+                veredito = df_vereditos[df_vereditos["posicao"] == posicao]
+                if not veredito.empty:
+                    row = veredito.iloc[0]
+                    color = "green" if row["resultado"] == "pass" else "red"
+                    box_component(
+                        color,
+                        row["resultado"],
+                        f"pos: {posicao} | sensor: {row['sensor']}",
+                    )
+                else:
+                    box_component("gray", "N/A", f"{posicao}")
+
 def temperature_page():
 
+    # Definindo o número máximo de tentativas
+    MAX_RETRIES = 3
+    retry_count = 0
+
     # Realizando um auto-refresh na página a cada 10 segundos
-    st_autorefresh(interval=30 * 1000)
+    st_autorefresh(interval=60 * 1000)
 
     ip = get_local_ip()
 
     response = requests.get(f"http://{ip}:5000/api/status")
     status = response.json()["status"]
+
+    st.write(f"Status do sistema: {status}")
 
     # Exibindo o status do sistema
     response = requests.get(f"http://{ip}:5000/api/planos")
@@ -81,15 +113,18 @@ def temperature_page():
     except:
         pass
 
-    # Inserindo os dados de temperatura
-    if ((df.empty or (df["timestamp"].max() <= (datetime.now() - timedelta(seconds=30)))) and status == "livre"):
+    # Primeira inserção de dados
+    if df.empty:
+        response = requests.post(f"http://{ip}:5000/api/plano/temperatura")
+    # Próximas inserções de dados
+    elif status == "livre" and not any(df["status"] == "executando"):
         response = requests.post(f"http://{ip}:5000/api/plano/temperatura")
 
     response = requests.get(f"http://{ip}:5000/api/planos")
     if response.status_code == 200:
         df = pd.DataFrame(response.json())
     
-    # Obtendo o id do último plano com o nome "temperatura" e status "finalizado"r
+    # Obtendo o id do último plano com o nome "temperatura" e status "finalizado"
     df = df[(df["nome"] == "temperatura") & (df["status"] == "finalizado")]
     df = df.sort_values("id", ascending=False).head(1)
 
@@ -108,54 +143,72 @@ def temperature_page():
         plano_id = df["id"].values[0]
     except:
         return
-    
-    # Obtendo os resultados dos testes
-    response = requests.get(f"http://{ip}:5000/api/planos/{plano_id}")
+
+    # Loop de requisição com tentativas
+    with st.spinner("Obtendo resultados dos testes..."):
+        while retry_count < MAX_RETRIES:
+            response = requests.get(f"http://{ip}:5000/api/planos/{plano_id}")
+            if response.status_code == 200:
+                break
+            retry_count += 1
+            time.sleep(1)
+
     if response.status_code != 200:
-        st.error("Erro ao obter os resultados dos testes")
+        st.error(
+            "Não foi possível obter os resultados dos testes após várias tentativas."
+        )
+        st.stop()
 
-    df_vereditos = pd.DataFrame(response.json()['vereditos'])
-
-    # st.dataframe(last_result)
-
-    # # Removendo a coluna timestamp que ficará duplicada ao juntar os dataframes
-    # df_dados.drop(columns=['timestamp'], inplace=True)
-
-    # # Juntando os 2 dataframes pelo index das colunas, mantendo a quantidade de linhas
-    # last_result = pd.concat([df_dados, df_vereditos], axis=1)
-
-    # last_result["timestamp"] = pd.to_datetime(last_result["timestamp"])
-
-    columns = st.columns(len(df_vereditos))
-
-    # Criando caixas coloridas indicando o status de cada sensor
-    for idx, row in df_vereditos.iterrows():
-        with columns[idx]:
-            color = 'green' if row['resultado'] == 'pass' else 'red'
-            box_component(color, f"{row['posicao']}", row['sensor'])
+    df_dados = pd.DataFrame(response.json()["dados"])
+    df_vereditos = pd.DataFrame(response.json()["vereditos"])
+    df_vereditos["timestamp"] = pd.to_datetime(df_vereditos["timestamp"])
+    create_boxes(df_vereditos)
 
     # Criando uma lista com todos os sensores
-    sensors = df_vereditos['sensor'].unique()
+    sensors = df_dados["sensor"].unique()
 
     # Realizando uma busca na API para obter os dados de temperatura por sensor
-    fig = None
+    # fig = None
     colors = px.colors.qualitative.Plotly
-    for i in range(len(sensors)):
-        response = requests.get(f"http://{ip}:5000/api/sensores/{sensors[i]}")
-        if response.status_code == 200:
-            df_dados = pd.DataFrame(response.json()['dados'])
-            df_dados["timestamp"] = pd.to_datetime(df_dados["timestamp"])
-            df_dados = df_dados.sort_values("timestamp")
-            # df_dados = df_dados[df_dados["timestamp"] >= (datetime.now() - timedelta(minutes=5))]
-            if fig is None:
-                fig = px.line(df_dados, x="timestamp", y="temperatura", title=f"Temperatura dos sensores", color_discrete_sequence=[colors[i]])
-            else:
-                trace = px.line(df_dados, x="timestamp", y="temperatura", title=f"Temperatura dos sensores", color_discrete_sequence=[colors[i]]).data[0]
-                trace.hovertemplate = f"Sensor {sensors[i]}<br>" + trace.hovertemplate
-                fig.add_trace(trace)
-    
-    if fig is not None:
 
-        # Desabilitando a interpolação para que os dados sejam exibidos de forma mais fiel
-        fig.update_traces(line_shape='linear')
-        st.plotly_chart(fig)
+    df_dados["timestamp"] = pd.to_datetime(df_dados["timestamp"])
+
+    df_dados["inicio"] = df_dados["timestamp"]
+    df_dados["fim"] = df_dados["timestamp"] + timedelta(seconds=1)
+
+    # Criando um gráfico de linha para cada sensor com base no dataframe "df_dados"
+    fig = px.line(df_dados, x='timestamp', y='temperatura', color='sensor', markers=True,
+              title="Temperaturas por Sensor ao Longo do Tempo")
+
+    st.plotly_chart(fig)
+
+    # for i in range(len(sensors)):
+    #     response = requests.get(f"http://{ip}:5000/api/sensores/{sensors[i]}")
+    #     if response.status_code == 200:
+    #         df_dados = pd.DataFrame(response.json()["dados"])
+    #         df_vereditos = pd.DataFrame(response.json()["vereditos"])
+    #         df_dados.drop(columns=["timestamp"], inplace=True)
+    #         df_sensor = pd.concat([df_dados, df_vereditos], axis=1)
+    #         df_sensor["timestamp"] = pd.to_datetime(df_sensor["timestamp"])
+    #         df_sensor = df_sensor.sort_values("timestamp")
+    #         last_timestamp = df_sensor["timestamp"].max()
+    #         df_sensor = df_sensor[df_sensor["timestamp"] > (last_timestamp - timedelta(minutes=60))]
+    #         st.dataframe(df_dados)
+    #         st.dataframe(df_vereditos)
+    #         if fig is None:
+    #             fig = px.line(
+    #                 df_sensor,
+    #                 x="timestamp",
+    #                 y="temperatura",
+    #                 title=f"Temperatura dos sensores",
+    #                 color_discrete_sequence=[colors[i]],
+    #             )
+    #         trace = px.line(
+    #             df_sensor,
+    #             x="timestamp",
+    #             y="temperatura",
+    #             title=f"Temperatura dos sensores",
+    #             color_discrete_sequence=[colors[i]],
+    #         ).data[0]
+    #         trace.hovertemplate = f"Sensor {sensors[i]}<br>" + trace.hovertemplate
+    #         fig.add_trace(trace)
