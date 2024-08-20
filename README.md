@@ -35,7 +35,7 @@ Utilizando um sistema operacional baseado em Unix (Linux ou macOS), siga as inst
 ### Clonar o repositório
 
 ```bash
-git clone https://github.com/ifsc-sj-2024-1-pji29008/software.git
+git clone https://github.com/ifsc-sj-2024-1-pji29008/client.git
 ```
 
 Os comandos a seguir são para integração com o streamlit na branch front-end, para verificar em qual branch você está atualmente, use o seguinte comando:
