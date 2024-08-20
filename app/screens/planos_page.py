@@ -166,7 +166,7 @@ def planos_page(api_address):
     if plano_id:
         # Carregar e exibir os detalhes do plano selecionado
         plano_detalhes = requests.get(f"{api_address}/api/planos/{plano_id}").json()
-        st.json(plano_detalhes)  # Exibe os detalhes em formato JSON
+        # st.json(plano_detalhes)  # Exibe os detalhes em formato JSON
 
         df_vereditos = pd.DataFrame(plano_detalhes["vereditos"])
         df_vereditos["timestamp"] = pd.to_datetime(df_vereditos["timestamp"])
