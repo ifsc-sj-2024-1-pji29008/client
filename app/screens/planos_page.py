@@ -153,7 +153,7 @@ def planos_page(api_address):
 
     # Criação do menu dropdown
     plano_opcoes = {
-        f"id: {plano['id']}, nome: {plano['nome']}, temp: {plano["temperatura"]}, margem: {plano["margem_erro"]}, amostras: {plano["numero_amostras"]}": plano[
+        f"id: {plano['id']}, nome: {plano['nome']}, temp: {plano['temperatura']}, margem: {plano['margem_erro']}, amostras: {plano['numero_amostras']}": plano[
             "id"
         ]
         for plano in reversed(planos)
@@ -166,7 +166,7 @@ def planos_page(api_address):
     if plano_id:
         # Carregar e exibir os detalhes do plano selecionado
         plano_detalhes = requests.get(f"{api_address}/api/planos/{plano_id}").json()
-        # st.json(plano_detalhes)  # Exibe os detalhes em formato JSON
+        st.json(plano_detalhes)  # Exibe os detalhes em formato JSON
 
         df_vereditos = pd.DataFrame(plano_detalhes["vereditos"])
         df_vereditos["timestamp"] = pd.to_datetime(df_vereditos["timestamp"])
@@ -174,40 +174,8 @@ def planos_page(api_address):
 
         # Criando uma lista com todos os sensores
         df_dados = pd.DataFrame(plano_detalhes["dados"])
-        sensors = df_dados["sensor"].unique()
-
-        # Realizando uma busca na API para obter os dados de temperatura por sensor
-        fig = None
-        colors = px.colors.qualitative.Plotly
-        for i in range(len(sensors)):
-            response = requests.get(f"{api_address}/api/sensores/{sensors[i]}")
-            if response.status_code == 200:
-                df_dados = pd.DataFrame(response.json()["dados"])
-                df_dados["timestamp"] = pd.to_datetime(df_dados["timestamp"])
-                df_dados = df_dados.sort_values("timestamp")
-                # df_dados = df_dados[df_dados["timestamp"] >= (datetime.now() - timedelta(minutes=5))]
-                if fig is None:
-                    fig = px.line(
-                        df_dados,
-                        x="timestamp",
-                        y="temperatura",
-                        title=f"Temperatura dos sensores",
-                        color_discrete_sequence=[colors[i]],
-                    )
-                else:
-                    trace = px.line(
-                        df_dados,
-                        x="timestamp",
-                        y="temperatura",
-                        title=f"Temperatura dos sensores",
-                        color_discrete_sequence=[colors[i]],
-                    ).data[0]
-                    trace.hovertemplate = (
-                        f"Sensor {sensors[i]}<br>" + trace.hovertemplate
-                    )
-                    fig.add_trace(trace)
-
-        if fig is not None:
-            # Desabilitando a interpolação para que os dados sejam exibidos de forma mais fiel
-            fig.update_traces(line_shape="linear")
-            st.plotly_chart(fig)
+        # Criando um gráfico de linha para cada sensor com base no dataframe "df_dados"
+        df_dados["timestamp"] = pd.to_datetime(df_dados["timestamp"])
+        fig = px.line(df_dados, x='timestamp', y='temperatura', color='sensor', markers=True,
+              title="Temperaturas por Sensor ao Longo do Tempo")
+        st.plotly_chart(fig)
