@@ -16,10 +16,6 @@ st.set_page_config(
     layout="wide",
 )
 
-# Adiciona o logo da SensorWeb na sidebar
-# with st.sidebar:
-#     st.image("app/assets/logo.png")
-
 # Cria navegação entre as páginas
 page = option_menu(
     None,
