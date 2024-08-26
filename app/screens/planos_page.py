@@ -150,6 +150,7 @@ def planos_page(api_address):
     st.subheader("Resultados do plano")
     # Carregar os planos existentes
     planos = requests.get(f"{api_address}/api/planos").json()
+    st.write(planos)
 
     # Criação do menu dropdown
     plano_opcoes = {
@@ -166,16 +167,21 @@ def planos_page(api_address):
     if plano_id:
         # Carregar e exibir os detalhes do plano selecionado
         plano_detalhes = requests.get(f"{api_address}/api/planos/{plano_id}").json()
-        # st.json(plano_detalhes)  # Exibe os detalhes em formato JSON
 
-        df_vereditos = pd.DataFrame(plano_detalhes["vereditos"])
-        df_vereditos["timestamp"] = pd.to_datetime(df_vereditos["timestamp"])
-        create_boxes(df_vereditos)
+        try:
+            df_vereditos = pd.DataFrame(plano_detalhes["vereditos"])
+            df_vereditos["timestamp"] = pd.to_datetime(df_vereditos["timestamp"])
+            create_boxes(df_vereditos)
+        except KeyError:
+            st.warning("Falha ao carregar os vereditos.")
 
-        # Criando uma lista com todos os sensores
-        df_dados = pd.DataFrame(plano_detalhes["dados"])
-        # Criando um gráfico de linha para cada sensor com base no dataframe "df_dados"
-        df_dados["timestamp"] = pd.to_datetime(df_dados["timestamp"])
-        fig = px.line(df_dados, x='timestamp', y='temperatura', color='sensor', markers=True,
-              title="Temperaturas por Sensor ao Longo do Tempo")
-        st.plotly_chart(fig)
+        try:
+            # Criando uma lista com todos os sensores
+            df_dados = pd.DataFrame(plano_detalhes["dados"])
+            # Criando um gráfico de linha para cada sensor com base no dataframe "df_dados"
+            df_dados["timestamp"] = pd.to_datetime(df_dados["timestamp"])
+            fig = px.line(df_dados, x='timestamp', y='temperatura', color='sensor', markers=True,
+                title="Temperaturas por Sensor ao Longo do Tempo")
+            st.plotly_chart(fig)
+        except:
+            st.warning("Falha ao carregar os dados.")
